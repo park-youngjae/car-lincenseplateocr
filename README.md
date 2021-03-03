@@ -25,8 +25,7 @@ python detect.py
 --saved_model {학습 완료된 모델 정보 파일 경로}
 ```
 
-* 결과확인  ( ./output  )
-이미지 파일 이름.txt 확인
+* ./output/이미지 파일 이름.txt 확인
 
 
 
@@ -54,8 +53,7 @@ python test.py
 --saved_model {학습 완료된 모델 정보 파일 경로}
 ```
 
-* 결과확인
-Test Set 성능 확인
+* Test Set 성능 확인
 
 
 
@@ -71,7 +69,7 @@ lmdb >= 1.0.0
 
 
 
-## Download Links
+## File Download
 * 도커 이미지, 테스트셋, 학습된 모델 다운로드 : 
 https://gisto365-my.sharepoint.com/:f:/g/personal/youngjae_park_gm_gist_ac_kr/EvgXj7CHtdRArdp6RE3354EB5nEyhT3ikE__dXAj39WifQ?e=XX7F0m
 
