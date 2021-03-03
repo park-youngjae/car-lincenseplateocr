@@ -55,7 +55,35 @@ python test.py
 
 * Test Set 성능 확인
 
+## Directory
 
+* input 폴더
+```
+input
+├── car_0.jpg
+├── car_1.jpg
+├── ...
+└── test    
+    └── lmdb
+        ├── data.mdb
+        └── lock.mdb
+```
+
+* pretrained 폴더
+
+```
+pretrained
+├── Scratch.pth
+└── Fine-tuned.pth
+```
+
+* output 폴더
+```
+output
+├── car_0.txt
+├── car_1.txt
+└── ...
+```
 
 ## Dependency
 ```
@@ -66,8 +94,6 @@ nltk >= 3.5
 pillow >= 7.0.0
 lmdb >= 1.0.0
 ```
-
-
 
 ## File Download
 * 도커 이미지, 테스트셋, 학습된 모델 다운로드 : 
