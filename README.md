@@ -70,6 +70,24 @@ lmdb >= 1.0.0
 ```
 
 
+## Directory
+'''
+input
+└── test
+    └── lmdb
+        ├── data.mdb
+        └── lock.mdb
+'''
+
+
+'''
+pretrained
+├── Scrath.pth
+└── Fine-tuned.pth
+'''
+
+## 파일 다운로드
+https://gisto365-my.sharepoint.com/:f:/g/personal/youngjae_park_gm_gist_ac_kr/EvgXj7CHtdRArdp6RE3354EB5nEyhT3ikE__dXAj39WifQ?e=XX7F0m
 
 ## Reference
 https://github.com/clovaai/deep-text-recognition-benchmark
