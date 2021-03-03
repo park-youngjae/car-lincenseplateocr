@@ -57,7 +57,7 @@ python test.py
 
 ## Directory
 
-* input 폴더
+##### input 폴더
 ```
 input
 ├── car_0.jpg
@@ -69,7 +69,7 @@ input
         └── lock.mdb
 ```
 
-* pretrained 폴더
+##### pretrained 폴더
 
 ```
 pretrained
@@ -77,7 +77,7 @@ pretrained
 └── Fine-tuned.pth
 ```
 
-* output 폴더
+##### output 폴더
 ```
 output
 ├── car_0.txt
