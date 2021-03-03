@@ -69,5 +69,7 @@ pillow >= 7.0.0
 lmdb >= 1.0.0
 ```
 
+
+
 ## Reference
 https://github.com/clovaai/deep-text-recognition-benchmark
