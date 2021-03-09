@@ -26,7 +26,7 @@ class Batch_Balanced_Dataset(object):
         dashed_line = '-' * 80
         print(dashed_line)
         log.write(dashed_line + '\n')
-        print(f'dataset_root: {opt.train_data}\nopt.select_data: {opt.select_data}\nopt.batch_ratio: {opt.batch_ratio}')
+        #print(f'dataset_root: {opt.train_data}\nopt.select_data: {opt.select_data}\nopt.batch_ratio: {opt.batch_ratio}')
         log.write(f'dataset_root: {opt.train_data}\nopt.select_data: {opt.select_data}\nopt.batch_ratio: {opt.batch_ratio}\n')
         assert len(opt.select_data) == len(opt.batch_ratio)
 
@@ -104,7 +104,7 @@ def hierarchical_dataset(root, opt, select_data='/'):
     """ select_data='/' contains all sub-directory of root directory """
     dataset_list = []
     dataset_log = f'dataset_root:    {root}\t dataset: {select_data[0]}'
-    print(dataset_log)
+    #print(dataset_log)
     dataset_log += '\n'
     for dirpath, dirnames, filenames in os.walk(root+'/'):
         if not dirnames:
@@ -117,7 +117,7 @@ def hierarchical_dataset(root, opt, select_data='/'):
             if select_flag:
                 dataset = LmdbDataset(dirpath, opt)
                 sub_dataset_log = f'sub-directory:\t/{os.path.relpath(dirpath, root)}\t num samples: {len(dataset)}'
-                print(sub_dataset_log)
+                #print(sub_dataset_log)
                 dataset_log += f'{sub_dataset_log}\n'
                 dataset_list.append(dataset)
 
