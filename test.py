@@ -4,6 +4,15 @@ import time
 import string
 import argparse
 import re
+import logging
+import json
+import fire
+import os
+import lmdb
+import cv2
+import shutil
+
+import numpy as np
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -11,13 +20,156 @@ import torch.utils.data
 import torch.nn.functional as F
 import numpy as np
 from nltk.metrics.distance import edit_distance
+from datetime import datetime
 
 from utils import CTCLabelConverter, AttnLabelConverter, Averager
 from dataset import hierarchical_dataset, AlignCollate, Batch_Balanced_Dataset
 from model import Model
 
+
+lmdb_path = './input/lmdb/Test/data.mdb'
+print("Reading images...")
+# ======================================================================================================
+data_path = './input/Test'
+directory = './input/Test'
+if not os.path.exists(directory):
+    os.makedirs(directory)
+
+folder_list = []
+"""
+    with open('./input/gt_Test.txt', 'a') as gt:
+        for folder in os.listdir(data_path):
+            img_folder = folder + '.jpg'
+            folder_list.append(folder)
+            img_path = os.path.join(data_path,folder,'images',img_folder)
+            label_path = os.path.join(data_path,folder,'data.json')
+            target_path =os.path.join(directory,img_folder)
+            shutil.copy(img_path,target_path)
+            with open(label_path,'r',encoding='UTF-8') as json_file:
+                label = json.load(json_file)
+                label = label['value']
+                label = label.replace('\n','')
+                label = label.replace(' ','')
+
+            #fill = 'Test' + '/'+folder+'/'+'images'+'/'+folder +'.jpg'+'\t'+label +'\n'
+            fill = 'Copy' + '/'+'Test'+'/' + img_folder +'\t'+label +'\n'
+            gt.write(fill)
+"""
+gt_file_path = './input/gt_Test.txt'
+if not os.path.isfile(gt_file_path):
+    with open('./input/gt_Test.txt', 'a') as gt:
+        for folder in os.listdir(data_path):
+            label = folder.split('_')[0]
+            img_folder = folder
+            fill = 'Test' + '/' + img_folder + '\t' + label + '\n'
+            gt.write(fill)
+
+
+def checkImageIsValid(imageBin):
+        if imageBin is None:
+            return False
+        imageBuf = np.frombuffer(imageBin, dtype=np.uint8)
+        img = cv2.imdecode(imageBuf, cv2.IMREAD_GRAYSCALE)
+        imgH, imgW = img.shape[0], img.shape[1]
+        if imgH * imgW == 0:
+            return False
+        return True
+
+
+def writeCache(env, cache):
+        with env.begin(write=True) as txn:
+            for k, v in cache.items():
+                txn.put(k, v)
+
+
+def createDataset(checkValid=True):
+        """
+        Create LMDB dataset for training and evaluation.
+        ARGS:
+            inputPath  : input folder path where starts imagePath
+            outputPath : LMDB output path
+            gtFile     : list of image path and label
+            checkValid : if true, check the validity of every image
+        """
+        outputPath = './input/lmdb/Test'
+        os.makedirs(outputPath, exist_ok=True)
+        env = lmdb.open(outputPath, map_size=1099511627)
+        cache = {}
+        cnt = 1
+
+        gtFile = './input/gt_Test.txt'
+        with open(gtFile, 'r', encoding='UTF8') as data:
+            datalist = data.readlines()
+
+        nSamples = len(datalist)
+        for i in range(nSamples):
+            imagePath, label = datalist[i].strip('\n').split('\t')
+
+            # print('imagepath',imagePath)
+            inputPath = './input'
+            imagePath = os.path.join(inputPath, imagePath)
+            # print('imagepath2',imagePath)
+
+            # # only use alphanumeric data
+            # if re.search('[^a-zA-Z0-9]', label):
+            #     continue
+
+            if not os.path.exists(imagePath):
+                # print('%s does not exist' % imagePath)
+                print("Test images not loaded")
+                continue
+            with open(imagePath, 'rb') as f:
+                imageBin = f.read()
+            if checkValid:
+                try:
+                    if not checkImageIsValid(imageBin):
+                        print('%s is not a valid image' % imagePath)
+                        continue
+                except:
+                    print('error occured', i)
+                    with open(outputPath + '/error_image_log.txt', 'a') as log:
+                        log.write('%s-th image data occured error\n' % str(i))
+                    continue
+
+            imageKey = 'image-%09d'.encode() % cnt
+            labelKey = 'label-%09d'.encode() % cnt
+            cache[imageKey] = imageBin
+            cache[labelKey] = label.encode()
+
+            if cnt % 1000 == 0:
+                writeCache(env, cache)
+                cache = {}
+                # print('Written %d / %d' % (cnt, nSamples))
+            cnt += 1
+        nSamples = cnt - 1
+        cache['num-samples'.encode()] = str(nSamples).encode()
+        writeCache(env, cache)
+
+        #print('Created test dataset with %d samples' % nSamples)
+        print("%d samples loaded"%nSamples)
+        #os.remove('./input/gt_train.txt')
+
+if __name__ == '__main__':
+            fire.Fire(createDataset)
+        # ======================================================================================================
+
+
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+logging.basicConfig(
+    filename='Test_Environment_Log.log',
+    filemode='w',
+    format='%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s',
+    level=logging.INFO,
+    datefmt='%Y-%m-%d %H:%M:%S')
+
+logging.info('python test.py')
+def output_command(command):
+    bashCommand = command
+    process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
+    output, error = process.communicate()
+    return output, error
 
 def benchmark_all_eval(model, criterion, converter, opt, calculate_infer_time=False):
     """ evaluation with 10 benchmark evaluation datasets """
@@ -82,13 +234,15 @@ def benchmark_all_eval(model, criterion, converter, opt, calculate_infer_time=Fa
 
 def validation(model, criterion, evaluation_loader, converter, opt):
     """ validation or evaluation """
+    n_total = 0
     n_correct = 0
     n_wrong = 0
     norm_ED = 0
     length_of_data = 0
     infer_time = 0
     valid_loss_avg = Averager()
-
+    Intro = 'Ground Truth , Prediction , Correct/Incorrect'
+    logging.info(Intro)
     for i, (image_tensors, labels) in enumerate(evaluation_loader):
         batch_size = image_tensors.size(0)
         length_of_data = length_of_data + batch_size
@@ -143,6 +297,7 @@ def validation(model, criterion, evaluation_loader, converter, opt):
         confidence_score_list = []
         #with open(f'./Failure_log_test.txt', 'a') as log:
         for gt, pred, pred_max_prob in zip(labels, preds_str, preds_max_prob):
+                now = time.localtime()
                 if 'Attn' in opt.Prediction:
                     gt = gt[:gt.find('[s]')]
                     pred_EOS = pred.find('[s]')
@@ -160,9 +315,22 @@ def validation(model, criterion, evaluation_loader, converter, opt):
 
                 if pred == gt:
                     n_correct += 1
+                    n_total += 1
+                    line=gt,pred,'Correct'
+                    logging.info(line)
+                    #logging.info(gt,pred,'Correct')
+                    #logging.info(str(gt),'|',pred,'|','Correct','|',"%04d/%02d/%02d %02d:%02d:%02d"%(now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec))
+                    #logging.info(gt,'|',pred,'|','Correct')
+
 
                 if pred != gt:
                     n_wrong += 1
+                    n_total += 1
+                    line = gt,pred,'Incorrect'
+                    logging.info(line)
+                    #logging.info(gt,pred,'Incorrect')
+                    #logging.info(str(gt),'|',pred,'|','Incorrect','|',"%04d/%02d/%02d %02d:%02d:%02d"%(now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec))
+                    #logging.info(gt,'|',pred,'|','Incorrect')
 
                 # ICDAR2019 Normalized Edit Distance
                 if len(gt) == 0 or len(pred) == 0:
@@ -180,6 +348,9 @@ def validation(model, criterion, evaluation_loader, converter, opt):
                 confidence_score_list.append(confidence_score)
             #print(pred, gt, pred==gt, confidence_score)
 
+        logging.info('Correct Prediction : %d'%n_correct)
+        logging.info('Incorrect Prediction : %d'%n_wrong)
+        logging.info('Total : %d' % n_total)
         accuracy = n_correct / float(length_of_data) * 100
         norm_ED = norm_ED / float(length_of_data)  # ICDAR2019 Normalized Edit Distance
         #log.close
@@ -199,15 +370,17 @@ def test(opt):
     if opt.rgb:
         opt.input_channel = 3
     model = Model(opt)
-    print('model input parameters', opt.imgH, opt.imgW, opt.num_fiducial, opt.input_channel, opt.output_channel,
-          opt.hidden_size, opt.num_class, opt.batch_max_length, opt.Transformation, opt.FeatureExtraction,
-          opt.SequenceModeling, opt.Prediction)
+    #print('model input parameters', opt.imgH, opt.imgW, opt.num_fiducial, opt.input_channel, opt.output_channel,
+    #      opt.hidden_size, opt.num_class, opt.batch_max_length, opt.Transformation, opt.FeatureExtraction,
+    #      opt.SequenceModeling, opt.Prediction)
     model = torch.nn.DataParallel(model).to(device)
 
     # load model
-    print('loading pretrained model from %s' % opt.saved_model)
+    #print('loading pretrained model from %s' % opt.saved_model)
     model.load_state_dict(torch.load(opt.saved_model, map_location=device))
     opt.exp_name = '_'.join(opt.saved_model.split('/')[1:])
+    print('Pretrained model loaded')
+
     # print(model)
 
     """ keep evaluation model and result logs """
@@ -242,13 +415,15 @@ def test(opt):
                     pred = pred[:pred.find('[s]')]
 
             #log.write(eval_data_log)
-            print(f'{accuracy_by_best_model:0.3f}')
+            print(f'Accuracy : {accuracy_by_best_model:0.3f}%')
+            logging.info(f'Accuracy : {accuracy_by_best_model:0.3f}%')
             #log.write(f'{accuracy_by_best_model:0.3f}\n')
             #log.close()
 
 
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--eval_data', default = './input/lmdb/Test', help='path to evaluation dataset')
     parser.add_argument('--benchmark_all_eval', action='store_true', help='evaluate 10 benchmark evaluation datasets')
