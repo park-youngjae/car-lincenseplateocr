@@ -4,8 +4,8 @@
 
 * 차량 인식 도커 컨테이너  실행 및 접속
 ```
-sudo docker start car-ocr
-sudo docker attach car-ocr 
+docker start car-ocr
+docker attach car-ocr 
 ```
 
 * 이미지 업로드 (  ./input  )
